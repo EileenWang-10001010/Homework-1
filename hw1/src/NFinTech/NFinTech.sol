@@ -76,29 +76,98 @@ contract NFinTech is IERC721 {
 
     function setApprovalForAll(address operator, bool approved) external {
         // TODO: please add your implementaiton here
+        _operatorApproval[msg.sender][operator] = approved;
+        emit ApprovalForAll(msg.sender, operator, approved);
     }
 
     function isApprovedForAll(address owner, address operator) public view returns (bool) {
         // TODO: please add your implementaiton here
+        return _operatorApproval[owner][operator];
     }
 
     function approve(address to, uint256 tokenId) external {
         // TODO: please add your implementaiton here
+        address owner = ownerOf(tokenId);
+        require(msg.sender == owner || isApprovedForAll(owner, msg.sender), "Not authorized");
+        _tokenApproval[tokenId] = to;
+        emit Approval(owner, to, tokenId);
     }
 
     function getApproved(uint256 tokenId) public view returns (address operator) {
         // TODO: please add your implementaiton here
+        return _tokenApproval[tokenId];
     }
 
     function transferFrom(address from, address to, uint256 tokenId) public {
         // TODO: please add your implementaiton here
+        // address owner = ownerOf(tokenId);
+        // require(from == owner, "Not owner");
+        // require(msg.sender == owner || msg.sender == getApproved(tokenId) || isApprovedForAll(owner, msg.sender), "Not authorized");
+
+        // _balances[from] -= 1;
+        // _balances[to] += 1;
+        // _owner[tokenId] = to;
+        // delete _tokenApproval[tokenId];
+        // emit Transfer(from, to, tokenId);
+        _transfer(from, to, tokenId);
     }
 
-    function safeTransferFrom(address from, address to, uint256 tokenId, bytes calldata data) public {
-        // TODO: please add your implementaiton here
+    function _transfer(address from, address to, uint256 tokenId) internal {
+        address owner = _owner[tokenId];
+        require(owner == from, "ERROR: Owner is not the from address");
+        require(msg.sender == owner || isApprovedForAll(owner, msg.sender) || getApproved(tokenId) == msg.sender, "ERROR: Caller doesn't have permission to transfer");
+        delete _tokenApproval[tokenId];
+        _balances[from] -= 1;
+        _balances[to] += 1;
+        _owner[tokenId] = to;
+        emit Transfer(from, to, tokenId);
     }
 
-    function safeTransferFrom(address from, address to, uint256 tokenId) public {
+    function safeTransferFrom(address from, address to, uint256 tokenId, bytes calldata data) public  {
         // TODO: please add your implementaiton here
+        _safeTransfer(from, to, tokenId, data);
+    }      
+    
+
+    function safeTransferFrom(address from, address to, uint256 tokenId) public  {
+        // TODO: please add your implementaiton here
+        _safeTransfer(from, to, tokenId, "");
     }
+
+    function _safeTransfer(address from, address to, uint256 tokenId, bytes memory data) internal {
+        
+        _transfer(from, to, tokenId);
+        require(_checkOnERC721Received(from, to, tokenId, data), "ERROR: ERC721Receiver is not implmeneted");
+        
+        // if (to != address(this)) {
+            
+        //     if (to.code.length > 0){
+        //         bytes4 retval = IERC721TokenReceiver(to).onERC721Received(msg.sender, from, tokenId, data);
+        //         require(retval == IERC721TokenReceiver.onERC721Received.selector, "Transfer to non ERC721Receiver");
+        //     }
+        // }
+    }
+    // Reference Link: https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC721/ERC721.sol#L429-L451
+    function _checkOnERC721Received(address from, address to, uint256 tokenId, bytes memory data) private returns (bool) {
+        if (to.code.length > 0 /* to is a contract*/) {
+            try IERC721TokenReceiver(to).onERC721Received(msg.sender, from, tokenId, data) returns (bytes4 retval) {
+                return retval == IERC721TokenReceiver.onERC721Received.selector;
+            } catch (bytes memory reason) {
+                if (reason.length == 0) {
+                    revert("ERC721: transfer to non ERC721Receiver implementer");
+                } else {
+                    /// @solidity memory-safe-assembly
+                    assembly {
+                        revert(add(32, reason), mload(reason))
+                    }
+                }
+            }
+        } else {
+            return true;
+        }
+    }
+
 }
+// reference to https://hackmd.io/@rogerwutw/BJ3CoxkTK#%E7%9C%8B%E7%AF%84%E4%BE%8B%E5%AD%B8-Solidity---ERC721, 
+// https://ithelp.ithome.com.tw/m/articles/10307884
+// chatgpt
